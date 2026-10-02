@@ -1,0 +1,20 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "This repository's own pins: the SHA-pinned GitHub Actions, the Renovate engine (renovate-version in renovate.yml and the validator image in validate.yml) and the renovatebot/github-action wrapper.",
+  "extends": [
+    "local>infrabay/renovate"
+  ],
+  "packageRules": [
+    {
+      "description": "Renovate releases several times a day: take the engine (both workflows) and the github-action wrapper as one PR a week, on Mondays",
+      "matchPackageNames": [
+        "ghcr.io/renovatebot/renovate",
+        "renovatebot/github-action"
+      ],
+      "groupName": "renovate",
+      "schedule": [
+        "* * * * 1"
+      ]
+    }
+  ]
+}

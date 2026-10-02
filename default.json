@@ -1,0 +1,35 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Org-wide preset, used as \"extends\": [\"local>infrabay/renovate\"]: recommended defaults with the Dependency Dashboard, GitHub Actions pinned to commit digests, `# renovate:`-annotated version pins in workflows, a 'dependencies' label, at most 5 open and 3 new PRs per hour, and grouped Go minor/patch and GitHub Actions updates. Repository-specific rules belong in that repository's renovate.json.",
+  "extends": [
+    "config:recommended",
+    ":dependencyDashboard",
+    "helpers:pinGitHubActionDigests",
+    "customManagers:githubActionsVersions"
+  ],
+  "labels": [
+    "dependencies"
+  ],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 3,
+  "packageRules": [
+    {
+      "description": "Routine Go minor/patch bumps arrive as one grouped PR",
+      "matchManagers": [
+        "gomod"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "go minor/patch"
+    },
+    {
+      "description": "GitHub Actions updates grouped; digests pinned by the preset above",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "github actions"
+    }
+  ]
+}

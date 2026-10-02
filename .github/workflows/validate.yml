@@ -1,0 +1,40 @@
+name: Validate Renovate config
+
+# Checks config.js, default.json and renovate.json. Uses no secrets and no App token, so it is safe
+# to run for pull requests, including those from forks.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions: {}
+
+concurrency:
+  group: validate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: renovate-config-validator
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    # The same Renovate version as renovate.yml; Renovate bumps both in one PR (see renovate.json).
+    container:
+      image: ghcr.io/renovatebot/renovate:44.132.2@sha256:0191afbc3937e5316263426fc0ce1450f5c143d42e3f91da8c6f771e317fae51
+      # GitHub-hosted runners run as 1001:127 (as in renovatebot/github-action's own CI).
+      options: -u 1001:0 --group-add 1000 --group-add 12021 --group-add 127
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Validate global config (config.js)
+        run: renovate-config-validator --strict config.js
+
+      - name: Validate org preset and repository config (default.json, renovate.json)
+        run: renovate-config-validator --strict --no-global default.json renovate.json

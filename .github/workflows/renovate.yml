@@ -1,0 +1,144 @@
+name: Renovate
+
+# Self-hosted Renovate for the infrabay organization, authenticated as the org's Renovate GitHub App.
+# It runs only on the schedule or by hand. There is deliberately no push / pull_request trigger, so
+# no branch or fork can reach the App's private key. The key is also an environment secret that only
+# the default branch can read (see README.md).
+
+on:
+  schedule:
+    # Weekdays at 05:17 UTC (off the top of the hour, when GitHub's scheduler is busiest).
+    - cron: '17 5 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      logLevel:
+        description: Log level (the logs of this public repository are public)
+        type: choice
+        default: info
+        options:
+          - info
+          - debug
+      dryRun:
+        description: Dry run (none = open and update branches and PRs for real)
+        type: choice
+        default: none
+        options:
+          - none
+          - extract
+          - lookup
+          - full
+      repoCache:
+        description: Repository cache
+        type: choice
+        default: enabled
+        options:
+          - enabled
+          - disabled
+          - reset
+
+# GITHUB_TOKEN gets no scopes by default; the job asks for read-only contents. Renovate itself never
+# uses GITHUB_TOKEN: it works with the App installation token minted below.
+permissions: {}
+
+# One Renovate at a time. A run is never cancelled midway, because it may be pushing a branch.
+concurrency:
+  group: renovate
+  cancel-in-progress: false
+
+jobs:
+  renovate:
+    name: Renovate
+    runs-on: ubuntu-24.04
+    # Installation tokens expire after 1 hour; stop well before that.
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    # Holds the RENOVATE_APP_PRIVATE_KEY secret. Restrict the environment's deployment branches to
+    # main and add no reviewers or wait timer. deployment: false = no deployment record per run.
+    environment:
+      name: renovate
+      deployment: false
+    env:
+      # Not RENOVATE_*-prefixed on purpose: the action forwards every RENOVATE_* variable into the
+      # container, where Renovate reads it as configuration. This is the image's repository-cache dir.
+      REPO_CACHE_DIR: /tmp/renovate/cache/renovate/repository
+      REPO_CACHE_KEY: renovate-repository-cache-v1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Restore Renovate repository cache
+        id: cache-restore
+        if: inputs.repoCache != 'disabled' && inputs.repoCache != 'reset'
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.REPO_CACHE_DIR }}
+          key: ${{ env.REPO_CACHE_KEY }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            ${{ env.REPO_CACHE_KEY }}-
+
+      # The restored files belong to the runner user; Renovate runs as uid 12021 in its container.
+      - name: Fix restored cache ownership
+        if: steps.cache-restore.outputs.cache-matched-key != ''
+        run: sudo chown -R 12021:0 /tmp/renovate/
+
+      # Minted right before use. The token is masked, limited to the repositories listed here (this
+      # list is what autodiscover in config.js sees), cut down to the permissions Renovate needs and
+      # revoked in the post step. To add a repository to Renovate, add it here; if the App
+      # installation uses "Only select repositories", add it there too.
+      - name: Mint GitHub App installation token
+        id: app-token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          # The App's Client ID (Iv23...). The numeric App ID works here as well.
+          client-id: ${{ vars.RENOVATE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RENOVATE_APP_PRIVATE_KEY }}
+          owner: infrabay
+          repositories: |
+            renovate
+            terraform-provider-nelm
+          permission-administration: read
+          permission-checks: write
+          permission-contents: write
+          permission-issues: write
+          permission-members: read
+          permission-pull-requests: write
+          permission-statuses: write
+          permission-vulnerability-alerts: read
+          permission-workflows: write
+
+      # The logs of this repository are public, and Renovate logs file names, dependencies and
+      # config of every repository it processes. Fail closed if the token can see a private one.
+      - name: Refuse private repositories
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          count=$(gh api --paginate /installation/repositories \
+            --jq '[.repositories[] | select(.private)] | length' | awk '{ n += $1 } END { print n + 0 }')
+          if [ "$count" -ne 0 ]; then
+            echo "::error::The App token can see ${count} private repositories. This public workflow must not process them: remove them from 'repositories' in the token step."
+            exit 1
+          fi
+
+      - name: Renovate
+        uses: renovatebot/github-action@6d26fcf0275dc65624cbc3d51fe78bc773f98321 # v46.3.6
+        with:
+          configurationFile: config.js
+          token: ${{ steps.app-token.outputs.token }}
+          # An exact version, written literally: Renovate's github-actions manager reads this input
+          # as the docker dependency ghcr.io/renovatebot/renovate and opens PRs to bump it.
+          renovate-version: 44.132.2
+        env:
+          LOG_LEVEL: ${{ inputs.logLevel || 'info' }}
+          # Empty values are ignored by Renovate, so scheduled runs use config.js as is.
+          RENOVATE_DRY_RUN: ${{ inputs.dryRun != 'none' && inputs.dryRun || '' }}
+          RENOVATE_REPOSITORY_CACHE: ${{ inputs.repoCache }}
+
+      - name: Save Renovate repository cache
+        if: inputs.repoCache != 'disabled'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.REPO_CACHE_DIR }}
+          key: ${{ env.REPO_CACHE_KEY }}-${{ github.run_id }}-${{ github.run_attempt }}
