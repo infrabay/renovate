@@ -48,7 +48,7 @@ concurrency:
 jobs:
   renovate:
     name: Renovate
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     # Installation tokens expire after 1 hour; stop well before that.
     timeout-minutes: 45
     permissions:
