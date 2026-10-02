@@ -15,7 +15,7 @@ such commands.
 
 | File | Purpose |
 | --- | --- |
-| [`.github/workflows/renovate.yml`](.github/workflows/renovate.yml) | Runs Renovate on weekdays at 05:17 UTC and on demand. |
+| [`.github/workflows/renovate.yml`](.github/workflows/renovate.yml) | Runs Renovate every hour at :17 and on demand. |
 | [`.github/workflows/validate.yml`](.github/workflows/validate.yml) | Validates the three config files on every PR and push to `main`. It uses no secrets. |
 | [`config.js`](config.js) | Global (self-hosted) configuration: autodiscovery, onboarding, allowed post-upgrade commands, how tools are installed, cache and commit identity. |
 | [`default.json`](default.json) | The org-wide preset. Repositories use it with `"extends": ["local>infrabay/renovate"]`. |
@@ -150,8 +150,10 @@ gh workflow run renovate.yml --repo infrabay/renovate -f logLevel=debug -f dryRu
 | `dryRun` | `none` (default), `extract`, `lookup`, `full` | `none` makes real changes. The others only log what Renovate would do. |
 | `repoCache` | `enabled` (default), `disabled`, `reset` | Use, skip or rebuild the repository cache. |
 
-Ticking a checkbox on a Dependency Dashboard (for example "rebase" or "create PR now") takes effect
-on the next run. To make it happen sooner, run the workflow by hand.
+This setup has no webhook: Renovate runs only from the hourly schedule or by hand. Ticking a
+checkbox on a Dependency Dashboard or in a Renovate PR (for example "rebase/retry" or "create PR
+now") therefore takes effect on the next hourly run, usually within an hour. To make it happen
+sooner, run the workflow by hand.
 
 ## Updating Renovate itself
 

@@ -7,8 +7,10 @@ name: Renovate
 
 on:
   schedule:
-    # Weekdays at 05:17 UTC (off the top of the hour, when GitHub's scheduler is busiest).
-    - cron: '17 5 * * 1-5'
+    # Every hour at :17 (off the top of the hour, when GitHub's scheduler is busiest). There is no
+    # webhook in this setup, so this is how often ticked PR / Dependency Dashboard checkboxes and
+    # rebases are picked up; when PRs open is still governed by each repository's own schedule.
+    - cron: '17 * * * *'
   workflow_dispatch:
     inputs:
       logLevel:
