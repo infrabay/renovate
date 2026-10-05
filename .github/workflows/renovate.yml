@@ -99,6 +99,7 @@ jobs:
           private-key: ${{ secrets.RENOVATE_APP_PRIVATE_KEY }}
           owner: infrabay
           repositories: |
+            peopleforce-cli
             renovate
             terraform-provider-nelm
           permission-administration: read
