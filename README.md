@@ -117,6 +117,12 @@ one.
 
 ### Post-upgrade commands
 
+Updates from the `gomod` manager need no post-upgrade command: the preset sets
+`"postUpdateOptions": ["gomodTidy"]`, so Renovate runs `go mod tidy` itself and drops the `go.sum`
+lines of the old version. Without it, a check such as `go mod tidy -diff` fails on every Go update
+PR. A post-upgrade command is needed only when a custom manager edits `go.mod`, because then the
+`gomod` manager does not run.
+
 `config.js` allows exactly one post-upgrade command, `go mod tidy` (`allowedCommands:
 ['^go mod tidy$']`). The Renovate image has no Go installed, so a repository that runs it must also
 ask for Go:
