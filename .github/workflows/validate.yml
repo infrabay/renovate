@@ -24,7 +24,7 @@ jobs:
       contents: read
     # The same Renovate version as renovate.yml; Renovate bumps both in one PR (see renovate.json).
     container:
-      image: ghcr.io/renovatebot/renovate:44.161.0@sha256:92b6100431d51547319638f996d8bed626d96e0d144176eb1a4e89c06ad5c6de
+      image: ghcr.io/renovatebot/renovate:44.198.3@sha256:bf344aa39d5b592ec728e1db5c3e1d940a5093a89a4598073efcb18d592d121c
       # GitHub-hosted runners run as 1001:127 (as in renovatebot/github-action's own CI).
       options: -u 1001:0 --group-add 1000 --group-add 12021 --group-add 127
     steps:
