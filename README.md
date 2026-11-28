@@ -4,7 +4,7 @@ Self-hosted [Renovate](https://docs.renovatebot.com/) for the `infrabay` GitHub 
 
 A scheduled GitHub Actions workflow runs Renovate as the org's own GitHub App (`infrabay-renovate`).
 Renovate opens dependency update PRs, keeps a Dependency Dashboard issue in each repository, and
-opens security fix PRs from Dependabot alerts.
+opens security fix PRs from the OSV database and from Dependabot alerts.
 
 It is self-hosted rather than the hosted Renovate app because some repositories need
 `postUpgradeTasks`. For example, `terraform-provider-nelm` bumps `github.com/werf/nelm` in `go.mod`
@@ -97,8 +97,9 @@ gh variable set RENOVATE_APP_CLIENT_ID --repo infrabay/renovate --body 'Iv23...'
 
 For each repository Renovate manages:
 
-- Turn on **Dependabot alerts** (Settings → Advanced Security). Renovate reads them to open security
-  fix PRs.
+- Turn on the **Dependency graph** and **Dependabot alerts** (Settings → Advanced Security). Renovate
+  reads the alerts to open security fix PRs. Without the Dependency graph GitHub raises no alerts, and
+  the alert list stays empty.
 - Leave **Dependabot security updates** and Dependabot version updates off. Renovate makes those
   PRs, and two bots would open duplicate PRs.
 - Keep Issues enabled, because the Dependency Dashboard is an issue.
@@ -106,8 +107,11 @@ For each repository Renovate manages:
 
 ## Adding a repository
 
-1. Add the repository name to `repositories:` in the "Mint GitHub App installation token" step of
-   [`renovate.yml`](.github/workflows/renovate.yml), and add it to the App installation.
+1. If the App installation is limited to selected repositories, an organization owner first adds
+   the repository there (**Organization settings → GitHub Apps → infrabay-renovate → Configure →
+   Repository access**). Then add the repository name to `repositories:` in the "Mint GitHub App
+   installation token" step of [`renovate.yml`](.github/workflows/renovate.yml). In the other order
+   the token step fails, and no repository is processed until the installation is updated.
 2. On the next run, Renovate opens an onboarding PR that adds a `renovate.json` extending
    `local>infrabay/renovate`. Merge it, or add your own config first. A repository that already has
    a Renovate config gets no onboarding PR.
@@ -115,11 +119,35 @@ For each repository Renovate manages:
 Only public repositories can be added. The workflow refuses to run if the token can see a private
 one.
 
+### Security fix PRs
+
+The preset sets `"osvVulnerabilityAlerts": true`. On every run Renovate checks the dependencies it
+found, for the datasources OSV supports, against the [OSV](https://osv.dev/) database and tries to
+open one `[SECURITY]` PR per vulnerable dependency, to the lowest fixed version it can find. These
+PRs are not grouped by default, and they ignore the schedule and the regular PR limits. The preset
+caps them separately at 3 open security PRs per repository (`vulnerabilityAlerts.prConcurrentLimit`).
+
+For Go this covers `// indirect` modules in `go.mod` (their routine updates stay off) and the
+standard library through the `toolchain` line. A `go.mod` without a `toolchain` line gets no
+standard library fixes.
+
+- Renovate matches by module version, so a PR can fix a vulnerability that `govulncheck` reports as
+  not reachable. Merge it, or close it: closing an unmerged PR normally suppresses the same update,
+  and for a major update it can suppress that whole major line. Reopen it when you are ready to
+  deal with the vulnerability.
+- A security fix can be a major update. Renovate does not run `go mod tidy` for those (see
+  [Post-upgrade commands](#post-upgrade-commands)), so they may need manual changes.
+- A dependency that a `packageRules` entry disables with `"enabled": false` gets no security PR.
+- Without a fix boundary in OSV and a release past it, Renovate cannot open a PR.
+- To opt a repository out, set `"osvVulnerabilityAlerts": false` in its `renovate.json`.
+
 ### Post-upgrade commands
 
 Updates from the `gomod` manager need no post-upgrade command: the preset sets
 `"postUpdateOptions": ["gomodTidy"]`, so Renovate runs `go mod tidy` itself and drops the `go.sum`
-lines of the old version. Without it, a check such as `go mod tidy -diff` fails on every Go update
+lines of the old version. This applies to minor and patch updates. Renovate skips `go mod tidy` for a
+major update unless `gomodUpdateImportPaths` is enabled, so a major update may need manual
+dependency, import and artifact changes. Without it, a check such as `go mod tidy -diff` fails on every Go update
 PR. A post-upgrade command is needed only when a custom manager edits `go.mod`, because then the
 `gomod` manager does not run.
 
@@ -183,7 +211,7 @@ Renovate keeps this repository up to date as well:
 | "Refuse private repositories" fails | A private repository is in the token's `repositories:` list. Remove it. |
 | A PR that touches `.github/workflows/` is never created, with "workflows permission" in the log | The App lacks **Workflows: Read and write**. |
 | `go.sum` is not updated, or the log says "Post-upgrade command ... has not been added to the allowed list" | The command must match `allowedCommands` in `config.js` exactly. Also add `installTools: { "golang": {} }` to that repository's `postUpgradeTasks`, or Go is missing. |
-| Security fix PRs never appear | Dependabot alerts are off in that repository, or the App lacks **Dependabot alerts: Read-only**. |
+| Security fix PRs never appear | For OSV: the repository sets `"osvVulnerabilityAlerts": false`, a `packageRules` entry disables the dependency, or the log has "Unable to read vulnerability information" (loading or processing the OSV data failed; read the attached error). For Dependabot alerts: the Dependency graph or Dependabot alerts are off in that repository, or the App lacks **Dependabot alerts: Read-only**. |
 | Scheduled runs stopped | GitHub disables scheduled workflows in a public repository after 60 days without repository activity. Re-enable the workflow on the Actions tab. Merging Renovate's own PRs here counts as activity. |
 | Strange or stale results | Run by hand with `repoCache=reset`, and with `logLevel=debug` if you need more detail. |
 | An onboarding PR was closed by mistake | Renovate then skips that repository. Add a `renovate.json` with `{"extends": ["local>infrabay/renovate"]}` by hand. |

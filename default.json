@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Org-wide preset, used as \"extends\": [\"local>infrabay/renovate\"]: recommended defaults with the Dependency Dashboard, GitHub Actions pinned to commit digests, `# renovate:`-annotated version pins in workflows, a 'dependencies' label, at most 5 open and 3 new PRs per hour, grouped Go minor/patch and GitHub Actions updates, and `go mod tidy` after Go module updates. Repository-specific rules belong in that repository's renovate.json.",
+  "description": "Org-wide preset, used as \"extends\": [\"local>infrabay/renovate\"]: recommended defaults with the Dependency Dashboard, GitHub Actions pinned to commit digests, `# renovate:`-annotated version pins in workflows, a 'dependencies' label, at most 5 open and 3 new PRs per hour, grouped Go minor/patch and GitHub Actions updates, `go mod tidy` after Go module updates, and security fix PRs from the OSV database (also for indirect Go modules and the Go toolchain line; they ignore the regular PR limits and are capped at 3 open per repository). Repository-specific rules belong in that repository's renovate.json.",
   "extends": [
     "config:recommended",
     ":dependencyDashboard",
@@ -12,6 +12,10 @@
   ],
   "prConcurrentLimit": 5,
   "prHourlyLimit": 3,
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "prConcurrentLimit": 3
+  },
   "postUpdateOptions": [
     "gomodTidy"
   ],
